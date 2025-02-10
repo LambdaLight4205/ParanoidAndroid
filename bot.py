@@ -6,6 +6,7 @@ from discord.ext import commands
 
 def default_config(id, cfg):
     if not id in cfg:
+        print(f'Setting default config for {id}')
         cfg[id] = {
             'roles': ['Admin']
         }
@@ -30,7 +31,7 @@ def get_server_config():
     with open("config.json", "r") as file:
         content = json.load(file)
 
-    return content
+    return {int(k): v for k, v in content.items()}
 
 def save_server_config(cfg):
     with open("config.json", "w") as file:
@@ -101,10 +102,21 @@ async def configure(interaction: discord.Interaction, category: str, action: str
         await interaction.response.send_message("Vous n'avez pas la permission d'utiliser cette commande", ephemeral=True)
         return
     
-    if category and category == 'roles':
-        if action and action == 'list':
-            liste_roles = get_admin_roles(interaction.guild_id)
+    if not category or not action:
+        await interaction.response.send_message(f'Arguments invalides pour la configuration')
+        return
+
+    server_id = interaction.guild_id
+    if category == 'roles':
+        if action == 'list':
+            liste_roles = get_admin_roles(server_id)
             await interaction.response.send_message(f'Liste des rôles ayant des permissions : {liste_roles}')
+            return
+        
+        if action == 'add' and value:
+            config[server_id]['roles'].append(value)
+            await interaction.response.send_message(f'Rôle {value} ajouté')
+            save_server_config(config)
             return
 
     await interaction.response.send_message(f'Arguments invalides pour la configuration')
