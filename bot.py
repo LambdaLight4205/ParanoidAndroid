@@ -1,14 +1,46 @@
 import discord
 import os
+import json
 from dotenv import load_dotenv
 from discord.ext import commands
 
-load_dotenv()
-print("Lancement du bot")
-bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
+def default_config(id, cfg):
+    if not id in cfg:
+        cfg[id] = {
+            'roles': ['Admin']
+        }
+        save_server_config(cfg)
+
+    return cfg
 
 def has_permission(user: discord.Member):
-    return any(role.name in ["Admin"] for role in user.roles)
+    global config
+    server_id = user.guild.id
+    config = default_config(server_id, config)
+
+    allowed_roles = config[server_id]['roles']
+
+    print(f"Permission test : {user.name} with roles {user.roles} from guild {server_id}")
+    return any(role.name in allowed_roles for role in user.roles)
+
+def get_admin_roles(server_id):
+    return config[server_id]['roles']
+
+def get_server_config():
+    with open("config.json", "r") as file:
+        content = json.load(file)
+
+    return content
+
+def save_server_config(cfg):
+    with open("config.json", "w") as file:
+        json.dump(cfg, file, indent=4)
+
+load_dotenv()
+config = get_server_config()
+
+print("Lancement du bot")
+bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 
 @bot.event
 async def on_ready():
@@ -62,5 +94,19 @@ async def ban(interaction: discord.Interaction, member: discord.Member):
     
     await interaction.response.send_message(f"{member} a été banni")
     await member.ban(reason="Tu as été banni définitivement")
+
+@bot.tree.command(name="configure", description="Configuer le bot")
+async def configure(interaction: discord.Interaction, category: str, action: str = None, value: str = None):
+    if not has_permission(interaction.user):
+        await interaction.response.send_message("Vous n'avez pas la permission d'utiliser cette commande", ephemeral=True)
+        return
+    
+    if category and category == 'roles':
+        if action and action == 'list':
+            liste_roles = get_admin_roles(interaction.guild_id)
+            await interaction.response.send_message(f'Liste des rôles ayant des permissions : {liste_roles}')
+            return
+
+    await interaction.response.send_message(f'Arguments invalides pour la configuration')
 
 bot.run(os.getenv('DISCORD_TOKEN'))
