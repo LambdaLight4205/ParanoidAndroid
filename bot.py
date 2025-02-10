@@ -15,10 +15,10 @@ async def on_ready():
     print("Bot allumé !")
     try:
         synced = await bot.tree.sync()
-        print(f"Commands syncronisées : {len(synced)}")
+        print(f"Commands synchronisées : {len(synced)}")
     except Exception as e:
         print(e)
-        
+
 @bot.event
 async def on_message(message: discord.Message):
     channel = message.channel
