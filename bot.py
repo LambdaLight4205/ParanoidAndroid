@@ -8,7 +8,7 @@ print("Lancement du bot")
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 
 def has_permission(user: discord.Member):
-    return any(role.name in ["Admin", "King", "Rooks"] for role in user.roles)
+    return any(role.name in ["Admin"] for role in user.roles)
 
 @bot.event
 async def on_ready():
