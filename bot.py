@@ -33,7 +33,7 @@ async def on_message(message: discord.Message):
 
 @bot.tree.command(name="github", description="Lien du GitHub de LambdaLight")
 async def github(interaction: discord.Interaction):
-    await interaction.response.send_message("Voici le lien de mon GitHub : https://github.com/LambdaLight4205")
+    await interaction.response.send_message("Voici le lien de mon GitHub : https://github.com/LambdaLight4205/ParanoidAndroid\nN'hésite pas à contribuer !")
 
 @bot.tree.command(name="creator", description="Informations à propos du créateur du bot")
 async def creator(interaction: discord.Interaction):
