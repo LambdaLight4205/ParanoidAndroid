@@ -1,6 +1,7 @@
 import discord
 import os
 import json
+import random
 from dotenv import load_dotenv
 from discord.ext import commands
 
@@ -28,7 +29,7 @@ def get_admin_roles(server_id):
     return config[server_id]['roles']
 
 def get_server_config():
-    with open("config.json", "r") as file:
+    with open("config.json", "r", encoding='utf-8') as file:
         content = json.load(file)
 
     return {int(k): v for k, v in content.items()}
@@ -77,6 +78,12 @@ async def creator(interaction: discord.Interaction):
     )
 
     await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="roast", description="Roast un utilisateur")
+async def roast(interaction: discord.Interaction, member: discord.Member):
+    sentence = random.choice(config[0])
+    sentence = sentence.replace('[Name]', member.mention)
+    await interaction.response.send_message(sentence)
 
 @bot.tree.command(name="warn", description="Alerter un utilisateur")
 async def warn(interaction: discord.Interaction, member: discord.Member):
