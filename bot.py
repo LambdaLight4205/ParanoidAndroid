@@ -61,6 +61,8 @@ async def on_message(message: discord.Message):
 
     if message.author.bot:
         return
+    
+    print(f'Message reçu de {author} dans le salon {channel} : {content}')
 
     if content.lower() == "bonjour":
         await channel.send(f"Salut {author} !")
