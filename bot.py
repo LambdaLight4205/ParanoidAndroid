@@ -81,7 +81,7 @@ async def creator(interaction: discord.Interaction):
 
 @bot.tree.command(name="roast", description="Roast un utilisateur")
 async def roast(interaction: discord.Interaction, member: discord.Member):
-    sentence = random.choice(config[0])
+    sentence = random.choice(config[-1])
     sentence = sentence.replace('[Name]', member.mention)
     await interaction.response.send_message(sentence)
 
