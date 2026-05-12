@@ -1,0 +1,4 @@
+tk
+javascript
+tkextrafont
+configparser
