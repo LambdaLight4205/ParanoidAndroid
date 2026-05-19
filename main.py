@@ -1,6 +1,7 @@
 import sys
 import threading
 from time import sleep
+from datetime import datetime
 from tkinter import ttk, Tk, Label
 from tkextrafont import Font
 from javascript import require, On
@@ -27,13 +28,14 @@ term = Terminal()
 
 # --- Utilities --- #
 def infomsg(message):
-    print(term.green + "[INFO] " + message + term.normal)
+    print(f"[{datetime.now()}]" + term.green + "[INFO] " + message + term.normal)
 
 def errormsg(message):
-    print(term.red + "[ERROR] " + message + term.normal)
+    print(f"[{datetime.now()}]" + term.red + "[ERROR] " + message + term.normal)
 
 def servermsg(message):
-    print(term.blue + "[SERVEUR] " + message + term.normal)
+    print(
+        f"[{datetime.now()}]" + term.blue + "[SERVEUR] " + message + term.normal)
 
 
 # ─── Bot Logic ───────────────────────────────────────────────────────────────
