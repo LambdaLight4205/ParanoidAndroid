@@ -5,11 +5,11 @@ from tkinter import ttk, Tk, Label
 from tkextrafont import Font
 from javascript import require, On
 from configparser import ConfigParser
+from blessed import Terminal
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
 CONFIG_PATH = "config.ini"
-ADMINS = {"LambdaLight", "VeldtCocktail"}
 
 config = ConfigParser()
 config.read(CONFIG_PATH)
@@ -23,17 +23,35 @@ PORT         = config.getint("server", "port")
 VERSION      = config.get("server", "version")
 
 mineflayer = require("mineflayer")
+term = Terminal()
 
-# ─── Bot Logic ────────────────────────────────────────────────────────────────
+# --- Utilities --- #
+def infomsg(message):
+    print(term.green + "[INFO] " + message + term.normal)
+
+def errormsg(message):
+    print(term.red + "[ERROR] " + message + term.normal)
+
+def servermsg(message):
+    print(term.blue + "[SERVEUR] " + message + term.normal)
+
+
+# ─── Bot Logic ───────────────────────────────────────────────────────────────
 
 class MinecraftBot:
-    def __init__(self):
+    def __init__(self, par):
+        self.par = par
+        self.active = False
         self.bot = None
         self.jumping = False
-        self._jump_thread = None
+        self.jump_thread = None
         self.auth_done = False
+        self.bot_threads_active = False
 
-    def start(self):
+    def connect(self):
+        if self.active:
+            return
+
         self.bot = mineflayer.createBot({
             "host": HOST,
             "port": PORT,
@@ -42,101 +60,136 @@ class MinecraftBot:
             "version": VERSION,
             "auth": "offline"
         })
-        print(f"\033[32m[INFO] Connecting {BOT_NAME} to {HOST}:{PORT}...\033[0m")
-        self._register_events()
 
-    def stop(self):
+        self.register_events()
+        
+        infomsg(f"Connecting {BOT_NAME} to {HOST}:{PORT}...")
+
+        self.bot_threads_active = False
+        self.auth_done = False
+        self.active = True
+        self.bot_threads_active = True
+
+    def disconnect(self):
         self.jumping = False
-        if self.bot:
-            self.bot.quit()
-            self.bot = None
-        print(f"\033[32m[INFO] Bot stopped.\033[0m")
+        if self.active:
+            try:
+                self.bot.quit()
+            except:
+                pass
 
-    def _register_events(self):
+            self.active = False
+            self.bot_threads_active = False
+
+        infomsg("Bot stopped.")
+
+    def register_events(self):
         @On(self.bot, "login")
         def on_login(this):
-            sleep(1)
-            print(f"\033[32m[INFO] {BOT_NAME} connected!\033[0m")
-            update_status("The bot is online")
+            infomsg(f"{BOT_NAME} connected !")
 
-        @On(self.bot, "messagestr")
-        def on_msg(this, msg, *_):
-            print("[SERVER]", msg)
+        @On(self.bot, "connect")
+        def on_connect(this):
+            infomsg("TCP connected.")
+
+        @On(self.bot, "end")
+        def on_end(this, *_):
+            infomsg("Connection ended.")
 
         @On(self.bot, "spawn")
         def on_spawn(this):
-            self.bot.chat(f"{BOT_NAME} connected!")
-            update_status("The bot is online")
+            infomsg(f"{BOT_NAME} spawned !")
 
         @On(self.bot, "error")
         def on_error(this, err, *_):
             print(f"\033[31m[ERROR] Connection error: {err}\033[0m")
-            on_disconnect()
+            self.disconnect()
+
+            infomsg("Reconnecting in 5 seconds...")
+            sleep(5)
+
+            try:
+                self.connect()
+            except Exception as e:
+                errormsg(str(e))
 
         @On(self.bot, "kicked")
         def on_kicked(this, reason, *_):
             print(f"\033[31m[ERROR] Kicked: {reason}\033[0m")
-            self.bot.end()
-            on_disconnect()
+            self.disconnect()
+
+            infomsg("Reconnecting in 5 seconds...")
+            sleep(5)
+
+            try:
+                self.connect()
+            except Exception as e:
+                errormsg(str(e))
 
         @On(self.bot, "messagestr")
         def on_msg(this, msg, *_):
+            msg = str(msg)
             print("[SERVER]", msg)
 
-            if self.auth_done:
-                return
+            lower_msg = msg.lower()
 
-            msg = str(msg).lower()
+            if not self.auth_done:
+                if "registerrequired" in lower_msg or "/reg" in lower_msg:
+                    sleep(1)
+                    self.bot.chat(BOT_REG)
+                    print(f"[INFO] Sent register command: {BOT_REG}")
+                    self.auth_done = True
 
-            if "registerrequired" in msg or "/reg" in msg:
-                sleep(1)
-                self.bot.chat(BOT_REG)
-                print(f"[INFO] Sent register command: {BOT_REG}")
-                self.auth_done = True
+                elif "loginrequired" in lower_msg or "/login" in lower_msg or "/l " in lower_msg:
+                    sleep(1)
+                    self.bot.chat(BOT_LOGIN)
+                    print(f"[INFO] Sent login command: {BOT_LOGIN}")
+                    self.auth_done = True
 
-            elif "loginrequired" in msg or "/login" in msg or "/l " in msg:
-                sleep(1)
-                self.bot.chat(BOT_LOGIN)
-                print(f"[INFO] Sent login command: {BOT_LOGIN}")
-
-            self.auth_done = True
 
         @On(self.bot, "chat")
         def on_chat(this, username, message, *_):
-            if username == BOT_NAME:
-                return
-            if message.startswith("."):
-                if username not in ADMINS:
-                    self.bot.chat("You don't have enough permissions.")
-                    return
-                self._handle_command(username, message)
+            if message.startswith("!"):
+                self.handle_command(username, message)
 
-    def _handle_command(self, sender, message):
+    def handle_command(self, sender, message):
         cmd = message.split()[0].lower()
         args = message[len(cmd):].strip()
 
-        if cmd == ".stop":
-            self.jumping = False
-            self.bot.clearControlStates()
-            self.bot.chat(f"{sender} stopped the bot.")
-
-        elif cmd == ".start":
+        if cmd == "!jump":
             if not self.jumping:
                 self.jumping = True
-                self._jump_thread = threading.Thread(target=self._jump_loop, daemon=True)
-                self._jump_thread.start()
+                self.jump_thread = threading.Thread(target=self.jump_loop, daemon=True)
+                self.jump_thread.start()
+                infomsg(f"{sender} started alternating jumps!")
                 self.bot.chat(f"{sender} started alternating jumps!")
 
-        elif cmd == ".command":
+            else:
+                self.jumping = False
+                self.jump_thread = None
+                infomsg(f"{sender} stopped alternating jumps!")
+                self.bot.chat(f"{sender} stopped alternating jumps!")
+
+        elif cmd == "!command":
             if args:
                 self.bot.chat(args)
             else:
-                self.bot.chat("Usage: .command <command>")
+                self.bot.chat("Usage: !command <command>")
+
+        elif cmd == "!sleep":
+            infomsg("Disconnecting bot for 10s")
+            self.disconnect()
+            sleep(10)
+
+            try:
+                self.connect()
+            except Exception as e:
+                errormsg(str(e))
 
         else:
             self.bot.chat(f"Unknown command: {cmd}")
 
-    def _jump_loop(self):
+    def jump_loop(self):
         while self.jumping:
             self.bot.setControlState("jump", True)
             sleep(3)
@@ -144,53 +197,50 @@ class MinecraftBot:
             sleep(3)
 
 
-# ─── GUI ──────────────────────────────────────────────────────────────────────
+# ─── GUI ─────────────────────────────────────────────────────────────────────
 
-mc_bot = MinecraftBot()
+class Application:
+    def __init__(self):
+        self.bot_class = MinecraftBot(self)
+        self.enabled = False
 
-def update_status(text):
-    bot_status.configure(text=text, font=("ebrima", 20))
+    def start(self):
+        self.enabled = True
+        self.console_chat_loop()
 
-def on_disconnect():
-    update_status("The bot is offline")
-    show_start_button()
 
-def show_start_button():
-    if "stop_button" in globals():
-        stop_button.destroy()
-    global start_button
-    start_button = ttk.Button(root, text="Start", command=on_start_click)
-    start_button.place(x=5, y=100, width=205)
+    def console_chat_loop(self):
+        while self.enabled:
+            try:
+                msg = input().strip()
+                cmd = msg.lower()
 
-def on_start_click():
-    start_button.destroy()
-    global stop_button
-    stop_button = ttk.Button(root, text="Stop", command=on_stop_click)
-    stop_button.place(x=5, y=100, width=205)
-    threading.Thread(target=mc_bot.start, daemon=True).start()
+                if cmd.startswith("!start"):
+                    if not self.bot_class.active:
+                        self.bot_class.connect()
+                        infomsg("Bot has been started")
 
-def on_stop_click():
-    mc_bot.stop()
-    update_status("The bot is offline")
-    show_start_button()
+                if cmd.startswith("!stop"):
+                    if self.bot_class.active:
+                        self.bot_class.disconnect()
 
-root = Tk()
-Font(file="ebrima.ttf", family="ebrima")
-bot_status = Label(root, text="The bot is offline", font=("ebrima", 20))
+                if cmd.startswith("!say"):
+                    if len(msg) > 5:
+                        self.bot_class.bot.chat(msg[5:])
+                    else:
+                        errormsg("Missing argument after <!say> command")
 
-root.tk.call("source", "forest-dark.tcl")
-root.title("")
-root.geometry("215x150")
-root.resizable(False, False)
-ttk.Style().theme_use("forest-dark")
+                if cmd.startswith("!goto"):
+                    args = msg.split(' ')
+                    pass
+                    # TODO: implémenter le pathfinding pour se déplacer
 
-bot_status.place(x=5, y=30)
+            except EOFError:
+                break
 
-start_button = ttk.Button(root, text="Start", command=on_start_click)
-start_button.place(x=5, y=100, width=205)
-
-if sys.platform == "win32":
-    from ctypes import windll
-    windll.shcore.SetProcessDpiAwareness(1)
-
-root.mainloop()
+            except Exception as e:
+                print(f"[ERROR] Console chat error: {e}")
+        
+if __name__ == "__main__":
+    app = Application()
+    app.start()
