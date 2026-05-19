@@ -29,7 +29,9 @@ term = Terminal()
 # --- Utilities --- #
 def current_time_str():
     now = datetime.now()
-    hours, minutes, seconds = now.hour, now.minute, now.second
+    hours = ('0' if len(str(now.hour)) < 2 else '') + str(now.hour)
+    minutes = ('0' if len(str(now.minute)) < 2 else '') + str(now.minute)
+    seconds = ('0' if len(str(now.second)) < 2 else '') + str(now.second)
     return f"[{hours}:{minutes}:{seconds}] "
 
 def infomsg(message):
@@ -190,18 +192,18 @@ class MinecraftBot:
                 infomsg(f"{sender} stopped alternating jumps!")
                 self.bot.chat(f"{sender} stopped alternating jumps!")
 
-        elif cmd == "!command":
-            if args:
-                self.bot.chat(args)
-            else:
-                self.bot.chat("Usage: !command <command>")
-
         elif cmd == "!sleep":
             infomsg("Disconnecting bot for 10s")
             threading.Thread(
                 target=self.sleep_reconnect,
                 daemon=True
             ).start()
+
+        elif cmd == "!help":
+            self.bot.chat("Bot commands :")
+            self.bot.chat("> !jump : enable/disable jumping")
+            self.bot.chat("> !sleep : disconnects the bot for 10s")
+            self.bot.chat("> !help : shows this list")
 
         else:
             self.bot.chat(f"Unknown command: {cmd}")
