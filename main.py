@@ -27,15 +27,28 @@ mineflayer = require("mineflayer")
 term = Terminal()
 
 # --- Utilities --- #
+def current_time_str():
+    now = datetime.now()
+    hours, minutes, seconds = now.hour, now.minute, now.second
+    return f"[{hours}:{minutes}:{seconds}] "
+
 def infomsg(message):
-    print(f"[{datetime.now()}]" + term.green + "[INFO] " + message + term.normal)
+    print(
+        current_time_str() + term.green
+        + "[INFO] " + message + term.normal
+    )
 
 def errormsg(message):
-    print(f"[{datetime.now()}]" + term.red + "[ERROR] " + message + term.normal)
+    print(
+        current_time_str() + term.red
+        + "[ERROR] " + message + term.normal
+    )
 
 def servermsg(message):
     print(
-        f"[{datetime.now()}]" + term.blue + "[SERVEUR] " + message + term.normal)
+        current_time_str() + term.blue
+        + "[SERVER] " + message + term.normal
+    )
 
 
 # ─── Bot Logic ───────────────────────────────────────────────────────────────
@@ -72,8 +85,12 @@ class MinecraftBot:
         self.active = True
         self.bot_threads_active = True
 
+        if self.jumping:
+            self.jump_thread = threading.Thread(target=self.jump_loop, daemon=True)
+            self.jump_thread.start()
+
     def disconnect(self):
-        self.jumping = False
+        sleep(0.5)
         if self.active:
             try:
                 self.bot.quit()
@@ -131,7 +148,7 @@ class MinecraftBot:
         @On(self.bot, "messagestr")
         def on_msg(this, msg, *_):
             msg = str(msg)
-            print("[SERVER]", msg)
+            servermsg(msg)
 
             lower_msg = msg.lower()
 
@@ -151,6 +168,7 @@ class MinecraftBot:
 
         @On(self.bot, "chat")
         def on_chat(this, username, message, *_):
+
             if message.startswith("!"):
                 self.handle_command(username, message)
 
@@ -180,13 +198,10 @@ class MinecraftBot:
 
         elif cmd == "!sleep":
             infomsg("Disconnecting bot for 10s")
-            self.disconnect()
-            sleep(10)
-
-            try:
-                self.connect()
-            except Exception as e:
-                errormsg(str(e))
+            threading.Thread(
+                target=self.sleep_reconnect,
+                daemon=True
+            ).start()
 
         else:
             self.bot.chat(f"Unknown command: {cmd}")
@@ -198,6 +213,16 @@ class MinecraftBot:
             self.bot.setControlState("jump", False)
             sleep(3)
 
+    def sleep_reconnect(self):
+        self.disconnect()
+
+        infomsg("Reconnecting in 10 seconds...")
+        sleep(10)
+
+        try:
+            self.connect()
+        except Exception as e:
+            errormsg(str(e))
 
 # ─── GUI ─────────────────────────────────────────────────────────────────────
 
